@@ -27,10 +27,13 @@ phases (see DESIGN.md §10).
 ## Getting started
 
 ```bash
-npm install        # also runs `prisma generate`
+npm install         # also runs `prisma generate`
+cp .env.example .env  # .env is gitignored — this is your local DB path config
 npm run db:migrate  # applies the schema to data/db/latitude.db
 npm run dev
 ```
+
+On Windows (PowerShell), use `Copy-Item .env.example .env` instead of `cp`.
 
 Open [http://localhost:3000](http://localhost:3000). `/import` lets you drop
 photos in and watch them get ingested; `/learn` is the curriculum.
