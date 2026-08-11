@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Source_Serif_4, JetBrains_Mono } from "next/font/google";
+import { NavBar } from "@/components/NavBar";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${archivo.variable} ${sourceSerif.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-paper text-ink font-sans">
+        <NavBar />
         {children}
       </body>
     </html>
