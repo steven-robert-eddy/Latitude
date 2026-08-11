@@ -1,0 +1,261 @@
+// Latitude — data model. See DESIGN.md §3 for the annotated version.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------- Photos: the shared spine ----------
+
+model Photo {
+  id           String    @id @default(cuid())
+  originalPath String // relative to data/photos
+  thumbPath    String
+  previewPath  String
+  filename     String
+  fileHash     String    @unique // dedupe on re-upload
+  width        Int
+  height       Int
+  capturedAt   DateTime?
+  importedAt   DateTime  @default(now())
+
+  // ---- File type and RAW handling ----
+  fileKind      String // "jpeg" | "raw" | "scan"
+  rawFormat     String? // "RAF", "ARW", "CR3", "DNG", "NEF"
+  previewSource String? // "embedded" | "decoded" | "native" — how previewPath was made
+  isRawDecoded  Boolean  @default(false)
+
+  // ---- Frame grouping ----
+  // One press of the shutter can produce several files: a RAF, its JPEG, and
+  // later an edited export. They share a frameGroupId and are ONE photograph.
+  frameGroupId String // cuid; a solo file gets its own group of one
+  role         String // "as_shot_jpeg" | "raw" | "edited" | "scan"
+  isPrimary    Boolean @default(true) // exactly one true per frameGroupId
+
+  importId String?
+  import   Import? @relation(fields: [importId], references: [id])
+
+  // Flattened EXIF for querying. Full blob kept in exifJson.
+  cameraMake     String?
+  cameraModel    String?
+  lensModel      String?
+  focalLength    Float? // mm
+  focalLength35  Float? // 35mm-equivalent, for cross-body comparison
+  apertureF      Float? // 2.8
+  shutterSec     Float? // 0.004
+  iso            Int?
+  expComp        Float?
+  meteringMode   String?
+  flashFired     Boolean?
+  filmSimulation String? // Fuji MakerNote
+  exifJson       String? // full parsed EXIF as JSON
+
+  notes String?
+
+  submissions      AssignmentSubmission[]
+  cullEntries      CullEntry[]
+  challengeEntries ChallengeEntry[]
+  recipeSamples    RecipeSample[]
+  critiques        Critique[]
+  tags             PhotoTag[]
+
+  @@index([capturedAt])
+  @@index([apertureF])
+  @@index([iso])
+  @@index([isPrimary])
+  @@index([fileKind])
+  @@index([frameGroupId])
+}
+
+model Import {
+  id         String   @id @default(cuid())
+  label      String // "CocoCay day 2", "walk downtown"
+  sourceNote String? // where the files came from
+  createdAt  DateTime @default(now())
+  fileCount  Int      @default(0)
+  status     String   @default("pending") // pending | running | complete | failed
+  errorLog   String? // JSON array of { filename, reason }
+
+  photos Photo[]
+}
+
+model PhotoTag {
+  id      String @id @default(cuid())
+  photoId String
+  photo   Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  label   String
+
+  @@unique([photoId, label])
+}
+
+// ---------- Curriculum ----------
+
+model Lesson {
+  id           String @id // slug, matches MDX filename
+  blockNumber  Int // grouping only — not a sequence
+  blockTitle   String
+  lessonNumber Int // position within block, for stable display
+  title        String
+  summary      String
+  estMinutes   Int
+  contentPath  String // path to MDX
+  skillTags    String // JSON array: ["exposure", "light"]
+
+  assignment Assignment?
+  progress   LessonProgress?
+
+  @@unique([blockNumber, lessonNumber])
+}
+
+model LessonProgress {
+  id          String    @id @default(cuid())
+  lessonId    String    @unique
+  lesson      Lesson    @relation(fields: [lessonId], references: [id])
+  status      String    @default("not_started") // not_started | reading | assigned | submitted | complete
+  startedAt   DateTime?
+  completedAt DateTime?
+  reflection  String? // free-text: what clicked, what didn't
+}
+
+model Assignment {
+  id              String @id @default(cuid())
+  lessonId        String @unique
+  lesson          Lesson @relation(fields: [lessonId], references: [id])
+  title           String
+  brief           String // what to shoot
+  constraints     String? // JSON: e.g. { "minPhotos": 3, "requireVaryingAperture": true }
+  successCriteria String // JSON array of strings — the self-check list
+  minPhotos       Int    @default(1)
+
+  submissions AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
+  photoId      String
+  photo        Photo      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  submittedAt  DateTime   @default(now())
+  role         String? // e.g. "f/2.8" or "backlit" — which slot in the assignment
+  selfNote     String?
+  criteriaMet  String? // JSON: { "criterionIndex": bool }
+
+  @@unique([assignmentId, photoId])
+}
+
+// ---------- Culling ----------
+
+model CullSession {
+  id          String    @id @default(cuid())
+  name        String
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  mode        String    @default("blind") // blind | comparative
+  entries     CullEntry[]
+}
+
+model CullEntry {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     CullSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  photoId     String
+  photo       Photo       @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  gutRating   Int? // 1-5, given before the checklist
+  finalRating Int? // 1-5, given after
+  picked      Boolean     @default(false)
+  order       Int
+  critique    Critique?
+
+  @@unique([sessionId, photoId])
+}
+
+model Critique {
+  id          String     @id @default(cuid())
+  cullEntryId String?    @unique
+  cullEntry   CullEntry? @relation(fields: [cullEntryId], references: [id], onDelete: Cascade)
+  photoId     String
+  photo       Photo      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  // Each axis scored 1-5 with an optional note
+  focusScore       Int?
+  focusNote        String?
+  exposureScore    Int?
+  exposureNote     String?
+  compositionScore Int?
+  compositionNote  String?
+  lightScore       Int?
+  lightNote        String?
+  subjectScore     Int?
+  subjectNote      String?
+  keeperReason     String?
+  createdAt        DateTime @default(now())
+}
+
+// ---------- Challenges ----------
+
+model Challenge {
+  id              String   @id @default(cuid())
+  title           String
+  prompt          String
+  rationale       String // what skill this is training
+  difficulty      String   @default("medium") // easy | medium | hard
+  relatedLessonId String?
+  isBuiltIn       Boolean  @default(true)
+
+  runs ChallengeRun[]
+}
+
+model ChallengeRun {
+  id          String    @id @default(cuid())
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  startedAt   DateTime  @default(now())
+  dueAt       DateTime?
+  completedAt DateTime?
+  reflection  String?
+  entries     ChallengeEntry[]
+}
+
+model ChallengeEntry {
+  id      String       @id @default(cuid())
+  runId   String
+  run     ChallengeRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  photoId String
+  photo   Photo        @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  isPick  Boolean      @default(false)
+  note    String?
+
+  @@unique([runId, photoId])
+}
+
+// ---------- Recipes ----------
+
+model Recipe {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  baseSimulation String // e.g. "Classic Chrome"
+  settingsJson   String // full param set — see DESIGN.md §8
+  sourceUrl      String?
+  notes          String?
+  bestFor        String? // JSON array: ["harsh sun", "green foliage"]
+  createdAt      DateTime @default(now())
+  isFavorite     Boolean  @default(false)
+
+  samples RecipeSample[]
+}
+
+model RecipeSample {
+  id        String @id @default(cuid())
+  recipeId  String
+  recipe    Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  photoId   String
+  photo     Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  sceneType String? // "shade", "golden hour", "indoor tungsten"
+  verdict   String? // "worked" | "muddy" | "too contrasty"
+
+  @@unique([recipeId, photoId])
+}

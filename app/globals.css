@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f2f4f3; /* base */
+  --paper-edge: #e4e8e7; /* dividers, card edges */
+  --ink: #14171a; /* primary text */
+  --ink-soft: #5a6169; /* secondary text, captions */
+  --mark: #e03c31; /* grease-pencil red — selections, picks, active state ONLY */
+  --green: #00713c; /* Fuji-box green — completion, correct, progress */
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-edge: var(--paper-edge);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-mark: var(--mark);
+  --color-green: var(--green);
+
+  /* Display / UI: engineered, condensed widths available. */
+  --font-sans: var(--font-archivo);
+  /* Reading: lessons are prose and prose wants a serif. */
+  --font-serif: var(--font-source-serif);
+  /* Data: every f-stop, shutter speed, and ISO renders mono. */
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
