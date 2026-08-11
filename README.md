@@ -6,11 +6,23 @@ ingestion pipeline, and the five modules this is built around.
 
 ## Status
 
-Phase 1 (foundation) is in place: the Prisma/SQLite schema, the photo
-ingestion pipeline (hashing, EXIF/RAW metadata extraction, thumbnail/preview
-generation, frame grouping), and a bare-bones `/import` page exercising it end
-to end. The curriculum, cull trainer, insights, challenges, and recipe modules
-come in later phases (see DESIGN.md §10).
+Phases 1, 1b, and 2 are in place — the two phases the design doc calls "the
+real project":
+
+- **Phase 1 — foundation.** Prisma/SQLite schema, the photo ingestion
+  pipeline (hashing, EXIF/RAW metadata extraction, thumbnail/preview
+  generation, frame grouping + primary election), manual entry and the roll
+  shortcut for scans.
+- **Phase 1b — bulk import.** Server-path and folder-drop import, a
+  concurrency-capped background job so large imports don't lock the app up,
+  per-file error handling, a post-import review screen.
+- **Phase 2 — Fundamentals Curriculum (v1 ship).** All twelve lessons
+  authored as MDX, the lesson grid with filters, the reader with a pinned
+  assignment brief, and the full take → submit → self-check → complete flow
+  with a required reflection.
+
+The cull trainer, insights, challenges, and recipe modules come in later
+phases (see DESIGN.md §10).
 
 ## Getting started
 
@@ -21,7 +33,7 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). `/import` lets you drop
-photos in and watch them get ingested.
+photos in and watch them get ingested; `/learn` is the curriculum.
 
 `data/` (the SQLite database and the photo store) is gitignored — it's local
 state, backed up by copying the folder, never committed.
@@ -30,12 +42,15 @@ state, backed up by copying the folder, never committed.
 
 Next.js (App Router) + TypeScript, Prisma over SQLite (via the
 `better-sqlite3` driver adapter), `sharp` for derivatives, `exifr` +
-`exiftool-vendored` for metadata, Tailwind for styling. See DESIGN.md §2 for
-the rationale.
+`exiftool-vendored` for metadata, `next-mdx-remote` for lesson content,
+Tailwind for styling. See DESIGN.md §2 for the rationale.
 
 ## Scripts
 
-- `npm run dev` / `npm run build` / `npm run start`
+- `npm run dev` / `npm run build` / `npm run start` — each re-indexes lesson
+  content first (`predev`/`prebuild`)
 - `npm run lint`
 - `npm run db:migrate` — Prisma migrate dev
 - `npm run db:studio` — Prisma Studio
+- `npm run lessons:index` — parse `content/lessons/*.mdx` and upsert into the DB
+- `npm run lessons:watch` — re-index automatically while editing lesson content
