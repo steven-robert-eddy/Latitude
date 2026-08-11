@@ -65,6 +65,66 @@ export async function reelectPrimary(frameGroupId: string): Promise<void> {
   );
 }
 
+/**
+ * The final grouping pass for a bulk import (§4b step 5). Per-file grouping
+ * during ingest queries for siblings that may not have landed yet — running
+ * several files concurrently means a RAF and its JPEG can each check for the
+ * other before either has been inserted, and end up in two separate solo
+ * groups. This re-derives the correct group for every photo in the batch
+ * (matching against the whole store, not just the batch, so a frame also
+ * joins a sibling from an earlier import) and merges any split groups back
+ * together before re-electing primaries.
+ */
+export async function regroupPhotos(photoIds: string[]): Promise<void> {
+  if (photoIds.length === 0) return;
+
+  const photos = await prisma.photo.findMany({
+    where: { id: { in: photoIds } },
+    select: { id: true, filename: true, capturedAt: true, frameGroupId: true },
+  });
+
+  // Bucket by (stem, second) so a RAF+JPG pair already in this batch is
+  // resolved once rather than once per file.
+  const buckets = new Map<string, { filename: string; capturedAt: Date }>();
+  const touchedGroups = new Set<string>();
+
+  for (const photo of photos) {
+    if (!photo.capturedAt) {
+      touchedGroups.add(photo.frameGroupId); // nothing to match on; leave as-is
+      continue;
+    }
+    const key = `${filenameStem(photo.filename)}|${truncateToSecond(photo.capturedAt).getTime()}`;
+    if (!buckets.has(key)) buckets.set(key, { filename: photo.filename, capturedAt: photo.capturedAt });
+  }
+
+  for (const { filename, capturedAt } of buckets.values()) {
+    const stem = filenameStem(filename);
+    const second = truncateToSecond(capturedAt);
+    const windowEnd = new Date(second.getTime() + 1000);
+
+    const candidates = await prisma.photo.findMany({
+      where: { capturedAt: { gte: second, lt: windowEnd } },
+      select: { filename: true, frameGroupId: true },
+    });
+    const trueMembers = candidates.filter((c) => filenameStem(c.filename) === stem);
+    const groupIds = [...new Set(trueMembers.map((m) => m.frameGroupId))];
+
+    if (groupIds.length <= 1) {
+      if (groupIds[0]) touchedGroups.add(groupIds[0]);
+      continue;
+    }
+
+    // Split group — merge every member onto one canonical id.
+    const [canonical, ...losers] = groupIds.sort();
+    await prisma.photo.updateMany({ where: { frameGroupId: { in: losers } }, data: { frameGroupId: canonical } });
+    touchedGroups.add(canonical);
+  }
+
+  for (const groupId of touchedGroups) {
+    await reelectPrimary(groupId);
+  }
+}
+
 function electPrimary(members: { id: string; role: string; importedAt: Date }[]): string {
   for (const role of ROLE_PRIORITY) {
     const candidates = members

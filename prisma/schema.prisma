@@ -37,7 +37,7 @@ model Photo {
   isPrimary    Boolean @default(true) // exactly one true per frameGroupId
 
   importId String?
-  import   Import? @relation(fields: [importId], references: [id])
+  import   Import? @relation(fields: [importId], references: [id], onDelete: Cascade)
 
   // Flattened EXIF for querying. Full blob kept in exifJson.
   cameraMake     String?
@@ -75,12 +75,30 @@ model Import {
   id         String   @id @default(cuid())
   label      String // "CocoCay day 2", "walk downtown"
   sourceNote String? // where the files came from
+  sourcePath String? // server-side path this was walked from, if any — enables retry
   createdAt  DateTime @default(now())
   fileCount  Int      @default(0)
-  status     String   @default("pending") // pending | running | complete | failed
-  errorLog   String? // JSON array of { filename, reason }
+  // Settled by the job runner as it works through fileCount files. Polled by
+  // the client instead of held in browser state, so the progress UI survives
+  // the page being closed and reopened (§4b).
+  processedCount  Int      @default(0)
+  duplicateCount  Int      @default(0) // files that hashed to a photo already in the store — skipped silently, reported in the summary
+  errorCount      Int      @default(0) // live count for the progress UI; errorLog (with reasons) is written once at completion
+  currentFilename String?
+  status          String   @default("pending") // pending | running | complete | failed
+  errorLog        String? // JSON array of { filename, reason } — written once the run finishes
 
   photos Photo[]
+}
+
+// Recently-used server-side import paths (§4b) — lets the UI offer "import
+// new files from /mnt/photos/2026" as a one-click action instead of making
+// every import start from a blank path field.
+model RecentImportPath {
+  id         String   @id @default(cuid())
+  path       String   @unique
+  lastUsedAt DateTime @default(now())
+  useCount   Int      @default(1)
 }
 
 model PhotoTag {

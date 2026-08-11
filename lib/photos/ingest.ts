@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import {
   ACCEPTED_RASTER_EXTENSIONS,
@@ -14,7 +15,7 @@ import { createPlaceholderDerivatives, generateDerivatives } from "./derivatives
 import { findFrameGroupId, reelectPrimary } from "./frame-grouping";
 import { sha256 } from "./hash";
 import { extractMetadata } from "./metadata";
-import { derivativePathFor, originalPathFor, writeDerivative, writeOriginal } from "./paths";
+import { absolutePath, derivativePathFor, originalPathFor, writeDerivative, writeOriginal } from "./paths";
 import { extractRawPreview } from "./raw-preview";
 import type { FileKind, FrameRole, IngestOptions, IngestResult, NormalizedMetadata } from "./types";
 
@@ -68,40 +69,57 @@ export async function ingestPhoto(buffer: Buffer, opts: IngestOptions): Promise<
 
     const frameGroupId = await findFrameGroupId(opts.filename, metadata.capturedAt);
 
-    await prisma.photo.create({
-      data: {
-        id,
-        originalPath: originalRelPath,
-        thumbPath: thumbRelPath,
-        previewPath: previewRelPath,
-        filename: opts.filename,
-        fileHash,
-        width,
-        height,
-        capturedAt: metadata.capturedAt,
-        fileKind,
-        rawFormat: isRaw ? ext.toUpperCase() : null,
-        previewSource,
-        isRawDecoded,
-        frameGroupId,
-        role,
-        isPrimary: true, // settled below by reelectPrimary once the full group is known
-        importId: opts.importId ?? null,
-        cameraMake: metadata.cameraMake,
-        cameraModel: metadata.cameraModel,
-        lensModel: metadata.lensModel,
-        focalLength: metadata.focalLength,
-        focalLength35: metadata.focalLength35,
-        apertureF: metadata.apertureF,
-        shutterSec: metadata.shutterSec,
-        iso: metadata.iso,
-        expComp: metadata.expComp,
-        meteringMode: metadata.meteringMode,
-        flashFired: metadata.flashFired,
-        filmSimulation: metadata.filmSimulation,
-        exifJson: JSON.stringify(buildExifJson(metadata, opts)),
-      },
-    });
+    try {
+      await prisma.photo.create({
+        data: {
+          id,
+          originalPath: originalRelPath,
+          thumbPath: thumbRelPath,
+          previewPath: previewRelPath,
+          filename: opts.filename,
+          fileHash,
+          width,
+          height,
+          capturedAt: metadata.capturedAt,
+          fileKind,
+          rawFormat: isRaw ? ext.toUpperCase() : null,
+          previewSource,
+          isRawDecoded,
+          frameGroupId,
+          role,
+          isPrimary: true, // settled below by reelectPrimary once the full group is known
+          importId: opts.importId ?? null,
+          cameraMake: metadata.cameraMake,
+          cameraModel: metadata.cameraModel,
+          lensModel: metadata.lensModel,
+          focalLength: metadata.focalLength,
+          focalLength35: metadata.focalLength35,
+          apertureF: metadata.apertureF,
+          shutterSec: metadata.shutterSec,
+          iso: metadata.iso,
+          expComp: metadata.expComp,
+          meteringMode: metadata.meteringMode,
+          flashFired: metadata.flashFired,
+          filmSimulation: metadata.filmSimulation,
+          exifJson: JSON.stringify(buildExifJson(metadata, opts)),
+        },
+      });
+    } catch (error) {
+      // Two files with identical bytes ingested concurrently can both pass
+      // the findUnique dedupe check above before either has inserted — the
+      // fileHash unique constraint is the real guard. Losing that race isn't
+      // a failure, it's a dedupe hit that arrived late.
+      if (isUniqueConstraintViolation(error, "fileHash")) {
+        await Promise.all([
+          fs.rm(absolutePath(originalRelPath), { force: true }),
+          fs.rm(absolutePath(thumbRelPath), { force: true }),
+          fs.rm(absolutePath(previewRelPath), { force: true }),
+        ]);
+        const existing = await prisma.photo.findUniqueOrThrow({ where: { fileHash }, select: { id: true } });
+        return { photoId: existing.id, created: false };
+      }
+      throw error;
+    }
 
     await reelectPrimary(frameGroupId);
 
@@ -149,6 +167,13 @@ function applyManualOverrides(extracted: NormalizedMetadata, opts: IngestOptions
     iso: manual.iso ?? extracted.iso,
     capturedAt: manual.capturedAt ?? extracted.capturedAt,
   };
+}
+
+function isUniqueConstraintViolation(error: unknown, field: string): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") return false;
+  const target = error.meta?.target;
+  const targetText = Array.isArray(target) ? target.join(",") : typeof target === "string" ? target : "";
+  return targetText.includes(field) || error.message.includes(field);
 }
 
 function buildExifJson(metadata: NormalizedMetadata, opts: IngestOptions): Record<string, unknown> {

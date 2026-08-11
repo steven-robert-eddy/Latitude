@@ -35,3 +35,20 @@ export async function writeDerivative(relativePath: string, buffer: Buffer): Pro
   await fs.mkdir(path.dirname(abs), { recursive: true });
   await fs.writeFile(abs, buffer);
 }
+
+/**
+ * Removes a photo's original + derivative files from disk. Best-effort —
+ * a file that's already gone is not an error. The DB row is a separate
+ * concern; callers delete that through Prisma (cascades handle related rows).
+ */
+export async function deletePhotoFiles(photo: {
+  originalPath: string;
+  thumbPath: string;
+  previewPath: string;
+}): Promise<void> {
+  await Promise.all(
+    [photo.originalPath, photo.thumbPath, photo.previewPath].map((relativePath) =>
+      fs.rm(absolutePath(relativePath), { force: true }),
+    ),
+  );
+}
