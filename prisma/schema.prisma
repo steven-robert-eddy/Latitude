@@ -122,6 +122,7 @@ model Lesson {
   estMinutes   Int
   contentPath  String // path to MDX
   skillTags    String // JSON array: ["exposure", "light"]
+  conditions   String // JSON array: ["any"] | ["sun"] | ["golden-hour"] | ["moving-subject"] | ["location"] — drives the lesson grid's conditions filter (§5.1)
 
   assignment Assignment?
   progress   LessonProgress?

@@ -1,0 +1,106 @@
+---
+id: metering-compensation
+blockNumber: 1
+blockTitle: Exposure
+lessonNumber: 4
+title: Metering and Exposure Compensation
+summary: What the meter actually does, where it breaks, and why you can't recover a clipped JPEG highlight.
+estMinutes: 6
+skillTags: ["exposure", "metering"]
+conditions: ["sun"]
+assignment:
+  title: Beat the meter
+  brief: |
+    Find a high-contrast scene — bright sky with something in shadow.
+    Shoot it at meter-recommended exposure, then at −1 compensation, then
+    at whatever your judgment says is actually correct. Then find a
+    mostly-white or mostly-dark scene (snow, a pale wall, a dark room) and
+    shoot it both at meter-recommended and corrected.
+  minPhotos: 5
+  constraints:
+    requireVaryingAperture: false
+  successCriteria:
+    - You can point to the clipped highlights in the meter-recommended frame
+    - The corrected frame holds highlight detail
+    - You wrote down the compensation value you'd start from next time in that situation
+---
+
+A light meter doesn't measure brightness the way you'd think. It measures
+how much light is coming off the scene, then recommends settings that
+would render the *average* of that light as middle grey — a fixed
+reference point, not a judgment about what the scene actually looked like.
+For an average scene — a typical mix of light and dark tones — that
+assumption works fine and the meter gets it right without your help. It
+fails predictably in two situations, and both are worth knowing by name.
+
+## Where the meter breaks
+
+**Snow, sand, a white wall, a bright sky filling most of the frame** — a
+scene that's genuinely brighter than average. The meter still tries to drag
+the average down to middle grey, so it underexposes. Your snow comes out
+the color of pavement.
+
+**A dark room, a black cat, a shadowed subject filling most of the frame**
+— genuinely darker than average. The meter drags the average *up* to
+middle grey, so it overexposes. Your black cat comes out grey.
+
+Neither is a malfunction. The meter is doing exactly what it's built to do;
+it just can't tell the difference between "this scene is dark" and "this
+scene is well-lit but I'm pointed at something dark." That distinction is
+yours to make.
+
+## Exposure compensation is the fix
+
+Exposure compensation tells the camera "take your reading, then shift it by
+this many stops" — positive to brighten, negative to darken, layered on top
+of whatever the meter already decided. For the snow scene, dialing in
+positive compensation fights the meter's instinct to darken it back toward
+grey. For the shadowed scene, negative compensation fights its instinct to
+brighten. You're not overriding the meter so much as telling it what kind
+of scene it's actually looking at.
+
+<FieldNote>
+  There's no universal number — how much compensation a scene needs depends
+  on how far it sits from average, which is a judgment call that gets
+  faster with repetition. Bright snow in full sun often wants +1 to +1⅔.
+  A dark, low-key scene often wants −1 to −2. Chimp the histogram, adjust,
+  reshoot. That loop is the actual skill.
+</FieldNote>
+
+## Reading a histogram
+
+A histogram is a graph of how many pixels sit at each brightness level,
+dark on the left to bright on the right. A spike jammed against the right
+edge means clipped highlights — pixels so bright the sensor recorded no
+detail there at all, just "maximum." A spike against the left edge means
+clipped shadows, the same problem in the dark direction. Neither spike
+touching an edge, roughly, is what you're aiming for in a scene you want to
+hold detail across.
+
+## Why this matters more on a Fuji JPEG than on RAW
+
+A RAW file captures more dynamic range than gets displayed, so a highlight
+that looks blown on the camera's screen sometimes has recoverable detail
+still sitting in the file — pull the exposure down in software and it
+comes back. A JPEG, including every recipe-rendered Fuji JPEG, has already
+thrown that extra data away at the moment of capture. If you clip a
+highlight in-camera on a JPEG, there is nothing left to recover; the
+information doesn't exist anymore. "Expose for the highlights" — bias
+your exposure toward protecting the brightest parts of the scene, even
+at the cost of underexposing everything else — is a nice-to-have on RAW
+and close to mandatory on JPEG.
+
+<CheckYourself question="You're shooting a backlit subject against a bright sky, straight off the meter, no compensation. What's most likely to go wrong, and in which direction would you correct?">
+  The meter reads the whole frame including the bright sky, drags the
+  average toward middle grey, and underexposes your subject — often
+  silhouetting it. You'd dial in positive exposure compensation to lift the
+  subject, accepting that the sky may now clip in exchange for a subject
+  that isn't a black shape.
+</CheckYourself>
+
+## What you're building
+
+The assignment isn't really about getting five correct exposures. It's
+about building a fast internal check — "is this scene brighter or darker
+than average, and by how much" — that runs before you press the shutter,
+not after you've already lost the highlight.

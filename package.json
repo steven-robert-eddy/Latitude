@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "npm run lessons:index",
     "dev": "next dev",
+    "prebuild": "npm run lessons:index",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "lessons:index": "tsx scripts/index-lessons.ts",
+    "lessons:watch": "tsx scripts/watch-lessons.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.1",
@@ -17,7 +21,9 @@
     "better-sqlite3": "^13.0.3",
     "exifr": "^7.1.3",
     "exiftool-vendored": "^37.2.0",
+    "gray-matter": "^4.0.3",
     "next": "16.3.0",
+    "next-mdx-remote": "^6.0.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "sharp": "^0.35.3",
